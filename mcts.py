@@ -90,26 +90,18 @@ class MCTSRootParallel:
 
     def __init__(self, number_of_processes: int, tree_policy: Callable, default_policy: AnyStr,
                  backup: Callable, time_limit: float = 1.0, k: int = 1, max_iter: int = int(1e10)):
-
         self._pool = Pool(number_of_processes)
         self._pipes = [Pipe() for _ in range(number_of_processes)]
         self._number_of_processes = number_of_processes
 
-        self._tree_policy = tree_policy
-        self._default_policy = default_policy
-        self._backup = backup
-        self._time_limit = time_limit
-        self._max_iter = max_iter
-        self._k = k
-
         agents: List[_MCTSRootParallel] = []
 
         for process_number in range(self._number_of_processes):
-            default_policy = RandomKStepRollOut(k=self._k, random_state=RandomState(process_number))
+            default_policy = RandomKStepRollOut(k=k, random_state=RandomState(process_number))
 
-            agent = _MCTSRootParallel(pipe=self._pipes[process_number][1], tree_policy=self._tree_policy,
-                                      default_policy=default_policy, backup=self._backup, time_limit=self._time_limit,
-                                      max_iter=self._max_iter)
+            agent = _MCTSRootParallel(pipe=self._pipes[process_number][1], tree_policy=tree_policy,
+                                      default_policy=default_policy, backup=backup, time_limit=time_limit,
+                                      max_iter=max_iter)
 
             self._pool.apply_async(agent.uct_search_with_pipes)
             agents.append(agent)
