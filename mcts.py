@@ -34,13 +34,14 @@ class MCTS(object):
     """
 
     def __init__(self, tree_policy: Callable, default_policy: Callable, backup: Callable, time_limit: float = 1.0,
-                 max_iter: int = int(1e10), persist_tree: bool = False, cache: bool = False):
+                 max_iter: int = int(1e10), persist_tree: bool = False, refit=False, cache: bool = False):
         self._tree_policy = tree_policy
         self._default_policy = default_policy
         self._backup = backup
         self._time_limit = time_limit
         self._max_iter = max_iter
         self._persist_tree = persist_tree
+        self._refit = refit
 
         self._belief: StateNode = None
         self._round_n: int = 0
@@ -117,7 +118,7 @@ class MCTS(object):
         offset: float = self._belief.depth if self._belief else 0
         self._max_depth = max(self._max_depth, state.depth - offset)
 
-        if self._persist_tree:
+        if self._persist_tree and self._refit:
             self._refit_predictions(leaf_node=state)
 
         action: A = numpy.random.choice(state.untried_actions)
@@ -137,7 +138,7 @@ class MCTSRootParallel:
 
     def __init__(self, number_of_processes: int, tree_policy: Callable, default_policy: AnyStr,
                  backup: Callable, time_limit: float = 1.0, k: int = 1, max_iter: int = int(1e10),
-                 persist_tree: bool = False, cache: bool = False):
+                 persist_tree: bool = False, refit: bool = False, cache: bool = False):
         self._pool = Pool(number_of_processes)
         self._pipes = [Pipe() for _ in range(number_of_processes)]
         self._number_of_processes = number_of_processes
@@ -149,7 +150,7 @@ class MCTSRootParallel:
 
             agent = _MCTSRootParallel(pipe=self._pipes[process_number][1], tree_policy=tree_policy,
                                       default_policy=default_policy, backup=backup, time_limit=time_limit,
-                                      max_iter=max_iter, persist_tree=persist_tree, cache=cache)
+                                      max_iter=max_iter, persist_tree=persist_tree, refit=refit, cache=cache)
 
             self._pool.apply_async(agent.uct_search_with_pipes)
             agents.append(agent)
@@ -167,9 +168,10 @@ class MCTSRootParallel:
 
 class _MCTSRootParallel(MCTS):
     def __init__(self, pipe: Pipe, tree_policy: Callable, default_policy: Callable, backup: Callable,
-                 time_limit: float = 1.0, max_iter: int = int(1e10), persist_tree: bool = False, cache: bool = False):
+                 time_limit: float = 1.0, max_iter: int = int(1e10), persist_tree: bool = False, refit: bool = False,
+                 cache: bool = False):
         super().__init__(tree_policy=tree_policy, default_policy=default_policy, backup=backup, time_limit=time_limit,
-                         max_iter=max_iter, persist_tree=persist_tree, cache=cache)
+                         max_iter=max_iter, persist_tree=persist_tree, refit=refit, cache=cache)
 
         self._pipe = pipe
 
