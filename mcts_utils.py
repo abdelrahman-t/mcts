@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, List, DefaultDict, Union
-from collections import defaultdict
+from typing import Generic, TypeVar, List, Dict, Union
 from multiprocessing import Pipe
 import numpy
 
@@ -46,23 +45,32 @@ class GameState(ABC, Generic[A]):
 class StateNode(Generic[A]):
     """StateNode represents a state node in the tree"""
 
-    def __init__(self, parent: Union['StateNode', None], action: A, game_state: GameState):
-        self._children: DefaultDict[A, StateNode] = defaultdict(lambda: None)
+    def __init__(self, parent: Union['StateNode', None], action: A, game_state: GameState, round_n: int = 0):
+        self._children: Dict[A, StateNode] = {}
         self._game_state = game_state
         self._parent = parent
         self._action = action
+        self._depth = parent._depth + 1 if parent else 0
+        self._round_n = round_n
         self._value = 0.0
         self._visits = 0
 
     def add_child(self, child: A, value: 'StateNode') -> None:
         self.children[child] = value
 
+    def make_root(self):
+        self._parent = None
+
+    @property
+    def round_n(self) -> int:
+        return self._round_n
+
     @property
     def state(self) -> GameState:
         return self._game_state
 
     @property
-    def children(self) -> DefaultDict[A, 'StateNode']:
+    def children(self) -> Dict[A, 'StateNode']:
         return self._children
 
     @property
@@ -75,11 +83,16 @@ class StateNode(Generic[A]):
 
     @property
     def untried_actions(self) -> List[A]:
-        return [action for action in self.game_state.actions if self.children[action] is None]
+        return [action for action in self.game_state.actions if self.children.get(action, None) is None]
 
     @property
     def game_state(self) -> GameState:
         return self._game_state
+
+    def refresh_state(self, round_n: int, game_state: GameState = None):
+        self._game_state = game_state or \
+                           self.parent.game_state.perform(self.action)
+        self._round_n = round_n
 
     @property
     def value(self) -> float:
@@ -96,6 +109,10 @@ class StateNode(Generic[A]):
     @property
     def action(self) -> A:
         return self._action
+
+    @property
+    def depth(self) -> int:
+        return self._depth
 
 
 class Worker:
